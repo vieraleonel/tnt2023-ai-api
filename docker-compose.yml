@@ -1,0 +1,58 @@
+services:
+  app:
+    image: node:18.16.0-slim
+    working_dir: '/app'
+    volumes:
+      - '.:/app'
+    networks:
+      - web
+      - internal
+    # restart: 'unless-stopped'          
+    command: ["node", "server.js"]
+    ports:
+      - 9191:9191
+    depends_on:
+      - weaviate
+    labels:
+      - traefik.http.routers.tnt2023-router.rule=Host(`tnt2023.panaltesting.com.ar`)
+      - traefik.http.routers.tnt2023-router.tls=true
+      - traefik.http.routers.tnt2023-router.tls.certresolver=lets-encrypt
+      - traefik.http.routers.tnt2023-router.service=tnt2023-srv
+      - traefik.http.services.tnt2023-srv.loadbalancer.server.port=9191
+
+  weaviate:
+    command:
+      - --host
+      - 0.0.0.0
+      - --port
+      - '8080'
+      - --scheme
+      - http
+    image: semitechnologies/weaviate:1.18.4
+    ports:
+      - 8080:8080
+    networks:
+      - internal
+    # restart: 'unless-stopped'
+    environment:
+      IMAGE_INFERENCE_API: 'http://i2v-neural:8080'
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      DEFAULT_VECTORIZER_MODULE: 'img2vec-neural'
+      ENABLE_MODULES: 'img2vec-neural'
+      CLUSTER_HOSTNAME: 'node1'
+  
+  i2v-neural:
+    image: semitechnologies/img2vec-pytorch:resnet50
+    networks:
+      - internal
+    # restart: 'unless-stopped'
+    environment:
+      ENABLE_CUDA: '0'
+
+networks:
+  web:
+    external: true
+  internal:
+    external: false
